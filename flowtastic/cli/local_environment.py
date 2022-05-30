@@ -5,7 +5,9 @@ import time
 from typing import TYPE_CHECKING, Any
 
 import typer
+from flowtastic.cli.colors import FlowTasticColors
 from rich.console import Console
+from rich.table import Table
 
 import docker
 
@@ -62,7 +64,7 @@ def create_network(
         network_name: The name of the network to create.
         labels: The labels to set on the network.
     """
-    console.log(f"Creating Docker network '{network_name}'...")
+    console.print(f"Creating Docker network '{network_name}'...")
     return client.networks.create(network_name, driver="bridge", labels=labels)
 
 
@@ -94,7 +96,7 @@ def create_container(
     Returns:
         The created container.
     """
-    console.log(f"Creating Docker container '{name}' from '{image}' Docker image...")
+    console.print(f"Creating Docker container '{name}' from '{image}' Docker image...")
     container = client.containers.run(
         image=image,
         name=name,
@@ -105,7 +107,7 @@ def create_container(
         labels=labels,
     )
     if network:
-        console.log(f"Connecting container '{name}' to network '{network.name}'...")
+        console.print(f"Connecting container '{name}' to network '{network.name}'...")
         network.connect(container)
     return container
 
@@ -184,7 +186,7 @@ def check_container_status(container: Container) -> None:
         container: The container to check the status of.
     """
     while container.status != "created":
-        console.log(container.status)
+        console.print(container.status)
         time.sleep(1)
 
 
@@ -194,9 +196,9 @@ def pull_docker_images(client: DockerClient) -> None:
     Args:
         client: The Docker client used to pull the images.
     """
-    console.log(f"Pulling '{ZOOKEEPER_DOCKER_IMAGE}' image...")
+    console.print(f"Pulling '{ZOOKEEPER_DOCKER_IMAGE}' image...")
     client.images.pull(ZOOKEEPER_DOCKER_IMAGE)
-    console.log(f"Pulling '{KAFKA_BROKER_DOCKER_IMAGE}' image...")
+    console.print(f"Pulling '{KAFKA_BROKER_DOCKER_IMAGE}' image...")
     client.images.pull(KAFKA_BROKER_DOCKER_IMAGE)
 
 
@@ -217,16 +219,18 @@ def deploy_local_kafka_broker(
         kafka_broker_port: The port on which the Kafka Broker will listen.
     """
     client = docker.from_env()
-    with console.status("🚀[bold] Deploying local Kafka environment..."):
+    with console.status(
+        f":rocket:[bold {FlowTasticColors.JADE}] Deploying local Kafka environment..."
+    ):
         try:
             pull_docker_images(client)
             network = create_network(client, labels={FLOWTASTIC_DOCKER_LABEL: None})
-            console.log(f"Created Docker network '{network.name}'")
+            console.print(f"Created Docker network '{network.name}'")
             zookeeper_container = run_zookeeper(
                 client, name=zookeeper_name, network=network, port=zookeeper_port
             )
             check_container_status(zookeeper_container)
-            console.log(f"Created Zookeeper container '{zookeeper_container.name}'")
+            console.print(f"Created Zookeeper container '{zookeeper_container.name}'")
             zookeeper_connect = f"{zookeeper_name}:{zookeeper_port}"
             kafka_broker_container = run_kafka_broker(
                 client,
@@ -236,15 +240,33 @@ def deploy_local_kafka_broker(
                 zookeeper_connect=zookeeper_connect,
             )
             check_container_status(kafka_broker_container)
-            console.log(
+            console.print(
                 f"Created Kafka Broker container '{kafka_broker_container.name}'"
             )
         except docker.errors.exceptions.DockerException as e:
-            console.log(f"❌ Error while deploying local Kafka environment: {e}")
+            console.print(
+                f":cross_mark:[bold red] Error while deploying local Kafka environment: {e}"
+            )
 
-    console.log("✅[bold green] Local Kafka environment deployed!")
-    console.log(f"  -> Zookeeper: [italic]'localhost:{zookeeper_port}'")
-    console.log(f"  -> Kafka Broker: [italic]'localhost:{kafka_broker_port}'")
+    console.print(
+        f":white_check_mark:[bold {FlowTasticColors.JADE}] Local Kafka environment deployed!"
+    )
+
+
+def get_flowtastic_networks(client: DockerClient) -> list[Network]:
+    """Gets the FlowTastic Docker networks.
+
+    Args:
+        client: The Docker client used to get the networks.
+
+    Returns:
+        The FlowTastic Docker networks.
+    """
+    return [
+        network
+        for network in client.networks.list()
+        if FLOWTASTIC_DOCKER_LABEL in network.attrs["Labels"]
+    ]
 
 
 def remove_flowtastic_network(client: DockerClient) -> None:
@@ -253,11 +275,25 @@ def remove_flowtastic_network(client: DockerClient) -> None:
     Args:
         client: The Docker client used to remove the network.
     """
-    network: Network
-    for network in client.networks.list():
-        if FLOWTASTIC_DOCKER_LABEL in network.attrs["Labels"]:
-            console.log(f"Removing network '{network.name}'...")
-            network.remove()
+    for network in get_flowtastic_networks(client):
+        console.print(f"Removing network '{network.name}'...")
+        network.remove()
+
+
+def get_flowtastic_containers(client: DockerClient) -> list[Container]:
+    """Returns all FlowTastic containers.
+
+    Args:
+        client: The Docker client used to get the containers.
+
+    Returns:
+        The list of FlowTastic containers.
+    """
+    return [
+        container
+        for container in client.containers.list()
+        if FLOWTASTIC_DOCKER_LABEL in container.labels
+    ]
 
 
 def remove_flowtastic_containers(client: DockerClient) -> None:
@@ -266,19 +302,52 @@ def remove_flowtastic_containers(client: DockerClient) -> None:
     Args:
         client: The Docker client used to remove the containers.
     """
-    container: Container
-    for container in client.containers.list():
-        if FLOWTASTIC_DOCKER_LABEL in container.labels:
-            console.log(f"Removing container '{container.name}'...")
-            container.remove(force=True)
+    for container in get_flowtastic_containers(client):
+        console.print(f"Removing container '{container.name}'...")
+        container.remove(force=True)
 
 
 def stop_local_kafka_broker() -> None:
     """Stops the local Kafka broker previously deployed using `deploy_local_kafka_broker`."""
     client = docker.from_env()
-    with console.status("🛑 [bold] Stopping local Kafka environment..."):
+    with console.status(
+        f":stop_sign:[bold {FlowTasticColors.JADE}] Stopping local Kafka environment..."
+    ):
         remove_flowtastic_containers(client)
         remove_flowtastic_network(client)
+
+
+def running_local_kafka_broker(client: DockerClient) -> bool:
+    """Checks if the FlowTastic Kafka Broker is running.
+
+    Args:
+        client: The Docker client used to check the containers.
+    """
+    client = docker.from_env()
+    containers = get_flowtastic_containers(client)
+    networks = get_flowtastic_networks(client)
+    return len(containers) > 0 and len(networks) > 0
+
+
+def build_info_table(containers: list[Container]) -> Table:
+    """Builds a table with the information of the FlowTastic Kafka local environment.
+
+    Args:
+        containers: The list of containers to build the table from.
+    """
+    table = Table(
+        title=f"[bold {FlowTasticColors.JADE}]FlowTastic Kafka Local Environment"
+    )
+    table.add_column("Container")
+    table.add_column("Image")
+    table.add_column("Ports")
+
+    for container in containers:
+        table.add_row(
+            container.name, container.image.tags[0], ", ".join(container.ports)
+        )
+
+    return table
 
 
 app = typer.Typer()
@@ -317,21 +386,39 @@ def start(
 ) -> None:
     """Deploys a local Kafka broker using Docker containers. The broker is mean to be used
     for development purposes."""
-    deploy_local_kafka_broker(
-        zookeeper_name=zookeeper_container_name,
-        zookeeper_port=zookeeper_port,
-        kafka_broker_name=kafka_broker_container_name,
-        kafka_broker_port=kafka_broker_port,
-    )
+    client = docker.from_env()
+    if not running_local_kafka_broker(client):
+        deploy_local_kafka_broker(
+            zookeeper_name=zookeeper_container_name,
+            zookeeper_port=zookeeper_port,
+            kafka_broker_name=kafka_broker_container_name,
+            kafka_broker_port=kafka_broker_port,
+        )
+    else:
+        console.print("[bold]FlowTastic Kafka environment already running!")
 
 
 @app.command()
 def stop() -> None:
     """Stops all the containers that were created by the `start` command."""
-    stop_local_kafka_broker()
+    client = docker.from_env()
+    if not running_local_kafka_broker(client):
+        console.print(
+            f"[bold {FlowTasticColors.JADE}]FlowTastic Kafka environment not running!"
+        )
+    else:
+        stop_local_kafka_broker()
 
 
 @app.command()
 def info() -> None:
     """Prints information about the local Kafka environment."""
-    pass
+    client = docker.from_env()
+    if not running_local_kafka_broker(client):
+        console.print(
+            f"[bold {FlowTasticColors.JADE}]FlowTastic Kafka environment not running!"
+        )
+    else:
+        containers = get_flowtastic_containers(client)
+        table = build_info_table(containers)
+        console.print(table)
