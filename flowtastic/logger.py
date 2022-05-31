@@ -50,5 +50,4 @@ def get_logger(name: str) -> logging.Logger:
     """
     logger = logging.getLogger(name)
     logger.setLevel(get_logging_level())
-    logger.addHandler(create_console_handler())
     return logger
