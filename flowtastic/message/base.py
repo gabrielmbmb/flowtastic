@@ -18,12 +18,26 @@ class Message(ABC):
     encoding: str
 
     def __init__(self, encoding: str = _DEFAULT_ENCODING) -> None:
+        """Inits `Message` class.
+
+        Args:
+            encoding: The encoding to use when decoding or encoding the message.
+        """
         self.encoding = encoding
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, Message):
-            raise NotImplementedError
-        return self.encoding == other.encoding
+        """Compares the `Message` class with another `Message` class. They are equal if the
+        encoding is the same.
+
+        Args:
+            other: The other `Message` class.
+
+        Return:
+            `True` if the `Message` classes are equal, `False` otherwise.
+        """
+        if isinstance(other, Message):
+            return self.encoding == other.encoding
+        raise NotImplementedError
 
     def decode(self, message: bytes) -> str:
         """Decode the message using the encoding specified in the class.
@@ -38,6 +52,8 @@ class Message(ABC):
 
     @abstractmethod
     def _deserialize(self, message: str) -> Any:
+        """Deserialize the message. This method should be implemented by the subclass to
+        generate a Python object from the message."""
         pass
 
     def deserialize(self, message: bytes) -> Any:
