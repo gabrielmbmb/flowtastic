@@ -243,10 +243,11 @@ def deploy_local_kafka_broker(
             console.print(
                 f"Created Kafka Broker container '{kafka_broker_container.name}'"
             )
-        except docker.errors.exceptions.DockerException as e:
+        except docker.errors.DockerException as e:
             console.print(
                 f":cross_mark:[bold red] Error while deploying local Kafka environment: {e}"
             )
+            raise typer.Abort()
 
     console.print(
         f":white_check_mark:[bold {FlowTasticColors.JADE}] Local Kafka environment deployed!"
