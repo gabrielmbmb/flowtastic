@@ -94,6 +94,30 @@ class FlowTastic:
         self.broker = broker
         self._loop = asyncio.get_event_loop()
 
+    def _register_deserialization_combo(
+        self,
+        topic: str,
+        func: SubscriberFunc,
+        message: Message,
+        pydantic_base_model: type[BaseModel],
+    ) -> None:
+        """Register a `Message` class and a `BaseModel` class to the `_topic_to_model`
+        dictionary.
+
+        Args:
+            topic: The topic to register the `Message` class and the `BaseModel` class to.
+            func: The subscriber function to register.
+            message: The `Message` class instance.
+            pydantic_base_model: The `BaseModel` class type.
+        """
+        deserialization_combo = _DeserializationCombo(
+            message=message,
+            pydantic_base_model=pydantic_base_model,
+        )
+        if deserialization_combo not in self._topic_to_model[topic]:
+            self._topic_to_model[topic].append(deserialization_combo)
+        self._model_to_subscriber[deserialization_combo].append(func)
+
     def subscribe(self, topic: str) -> Callable[[SubscriberFunc], SubscriberFunc]:
         """A decorator to register a function as a subscriber of a topic.
 
@@ -131,12 +155,12 @@ class FlowTastic:
             func_input_type = list(func.__annotations__.values())[0]
             func_input_message = cast(tuple[Any, ...], func.__defaults__)[0]
             if issubclass(func_input_type, BaseModel):
-                deserialization_combo = _DeserializationCombo(
-                    message=func_input_message, pydantic_base_model=func_input_type
+                self._register_deserialization_combo(
+                    topic=topic,
+                    func=func,
+                    message=func_input_message,
+                    pydantic_base_model=func_input_type,
                 )
-                if deserialization_combo not in self._topic_to_model[topic]:
-                    self._topic_to_model[topic].append(deserialization_combo)
-                self._model_to_subscriber[deserialization_combo].append(func)
             else:
                 pass
             return func
