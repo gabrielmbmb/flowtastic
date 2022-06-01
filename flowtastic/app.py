@@ -218,9 +218,10 @@ class FlowTastic:
         except DeserializationError as e:
             logger.warning(f"Failed to deserialize message: {e}")
         except ValidationError as e:
-            logger.warning(
-                f"Could not create '{pydantic_base_model.__class__.__name__}' from deserialized message: {e}"
-            )
+            if pydantic_base_model:
+                logger.warning(
+                    f"Could not create '{pydantic_base_model.__name__}' from deserialized message: {e}"
+                )
         return None
 
     async def _distribute_message(self, record: ConsumerRecord) -> None:
