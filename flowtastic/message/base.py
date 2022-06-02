@@ -9,7 +9,7 @@ _DEFAULT_ENCODING = "utf-8"
 
 
 class Message(ABC):
-    """Base class for messages.
+    """Base class for messages that can be serialized and deserialized.
 
     Args:
         encoding: The encoding to use when decoding or encoding the message.
@@ -38,6 +38,10 @@ class Message(ABC):
         if isinstance(other, Message):
             return self.encoding == other.encoding
         raise NotImplementedError
+
+    def __hash__(self) -> int:
+        """Returns the hash of the `Message` class."""
+        return hash(self.encoding)
 
     def decode(self, message: bytes) -> str:
         """Decode the message using the encoding specified in the class.
