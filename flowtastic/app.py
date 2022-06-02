@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable
 
 from aiokafka import AIOKafkaConsumer
 from flowtastic._deserialization_combo import _DeserializationCombo
 from flowtastic.logger import get_logger
-from flowtastic.message import DeserializationError, Message
+from flowtastic.message import DeserializationError, JSONMessage, Message
+from flowtastic.publish import Publish
 from flowtastic.types import DeserializationErrorFunc, ValidationErrorFunc
 from flowtastic.utils.asynchronous import create_gathering
 from flowtastic.utils.pydantic_models import is_base_model_subclass
@@ -19,6 +20,32 @@ if TYPE_CHECKING:
 
 
 logger = get_logger(__name__)
+
+
+def _get_subscriber_func_info(
+    func: SubscriberFunc,
+) -> tuple[type[BaseModel] | Any | None, Message | None, Publish | None]:
+    """Returns the type and default value of the argument, and the return type of one
+    `SubscriberFunc`.
+
+    Args:
+        func: The `SubscriberFunc` to get the type and default value of the argument, and the
+            return type of.
+
+    Returns:
+        A `tuple` containing the type and default value of the argument, and the return type of
+        the `SubscriberFunc`.
+    """
+    annotations = func.__annotations__
+    annotations_num = len(annotations)
+    defaults = func.__defaults__
+    if annotations_num >= 2 or (annotations_num == 1 and "return" not in annotations):
+        func_input_type = list(annotations.values())[0]
+    else:
+        func_input_type = None
+    func_output_type = annotations["return"] if "return" in annotations else None
+    func_input_default = defaults[0] if defaults else None
+    return func_input_type, func_input_default, func_output_type
 
 
 class FlowTastic:
@@ -41,6 +68,7 @@ class FlowTastic:
     _deserializer_to_subscriber: dict[
         _DeserializationCombo | Message, list[SubscriberFunc]
     ] = defaultdict(list)
+    _subscriber_to_publish: dict[SubscriberFunc, list[Publish]] = defaultdict(list)
 
     def __init__(self, name: str, broker: str) -> None:
         """Init `FlowTastic` class.
@@ -53,23 +81,28 @@ class FlowTastic:
         self.broker = broker
         self._loop = asyncio.get_event_loop()
 
-    def _register_deserializer(
+    def _register_subscriber(
         self,
         topic: str,
         func: SubscriberFunc,
         deserializer: Message | _DeserializationCombo,
+        publish: Publish | None = None,
     ) -> None:
         """Register a `Message` class or a `_DeserializationCombo` to the `_topic_to_deserializer`
-        dictionary and the subscriber function to the `_deserializer_to_subscriber` dictionary.
+        dictionary, the subscriber function to the `_deserializer_to_subscriber` dictionary
+        and the `Publish` to the `_subscriber_to_publish` dictionary.
 
         Args:
             topic: The topic to which `deserializer` should be registered.
             func: The subscriber function to register.
             deserializer: The `Message` class or the `_DeserializationCombo` class.
+            publish: The `Publish` class to register.
         """
         if deserializer not in self._topic_to_deserializer[topic]:
             self._topic_to_deserializer[topic].append(deserializer)
         self._deserializer_to_subscriber[deserializer].append(func)
+        if publish:
+            self._subscriber_to_publish[func].append(publish)
 
     def subscriber(
         self,
@@ -77,7 +110,25 @@ class FlowTastic:
         on_deserialization_error: DeserializationErrorFunc | None = None,
         on_validation_error: ValidationErrorFunc | None = None,
     ) -> Callable[[SubscriberFunc], SubscriberFunc]:
-        """A decorator to register a function as a subscriber of a topic.
+        """A decorator to register a function as a subscriber of a topic. A subscriber function
+        should accept a single argument and the type of this argument has to be a `BaseModel`
+        or type hints from `typing` module. The default value of this argument should be
+        a subclass of `Message` that will be used to deserialize the message. If no default
+        value is provided, then the `JSONMessage` class will be used. Additionaly, a subscriber
+        func return type can be annotated using an instance of the `Publish` class, in which
+        it can be defined in which topics should the return value be published.
+
+        >>> class Order(BaseModel):
+        ...     id: int
+        ...     name: str
+        ...     price: float
+        ...
+        >>> @app.subscriber(topic="topic")
+        ... def subscriber_func(
+        ...     order: Order = JSONMessage(),
+        ... ) -> Publish(to_topics=["discounted_orders"], message=JSONMessage()):
+        ...    order.price *= 0.9
+        ...    return order
 
         Args:
             topic: The topic to subscribe to.
@@ -87,8 +138,9 @@ class FlowTastic:
                 occurs. If not provided, then the error will be ignored.
 
         Raises:
-            ValueError: If the function is not a coroutine (async function) or if the function
-                has more than one parameter.
+            ValueError: If the function is not a coroutine (async function), if the function
+                has more than one parameter or if the function return type is not a `Publish`
+                class instance.
         """
 
         def register_subscriber(func: SubscriberFunc) -> SubscriberFunc:
@@ -114,26 +166,45 @@ class FlowTastic:
                     f"using `@{self.__class__.__name__}.subscribe` method takes more than "
                     f"one argument."
                 )
-            # TODO: handle no annotations
-            func_input_type = list(func.__annotations__.values())[0]
-            # TODO: handle default message if not provided
-            func_input_message = cast(tuple[Any, ...], func.__defaults__)[0]
+            (
+                func_input_type,
+                func_input_default,
+                func_output_type,
+            ) = _get_subscriber_func_info(func)
+            if not isinstance(func_output_type, Publish):
+                raise ValueError(
+                    f"The return type of the subscriber function must be an instance of "
+                    f"`{Publish.__name__}`. You're probably seeing this error because "
+                    f"one of the function that you have decorated using "
+                    f"`@{self.__class__.__name__}.subscribe` method has a return type "
+                    f"different from `{Publish.__name__}`."
+                )
+            if not func_input_default:
+                logger.debug(
+                    f"Subscriber func {func} did not have default value. Using `JSONMessage`..."
+                )
+                func_input_default = JSONMessage()
+            deserializer: Message | _DeserializationCombo
             if is_base_model_subclass(func_input_type):
                 logger.debug(
                     f"Registering {func} as subscriber for '{topic}' topic with deserialization "
-                    f"of `{func_input_message}` to `{func_input_type}` `pydantic.BaseModel`"
+                    f"of `{func_input_default}` to `{func_input_type}` `pydantic.BaseModel`"
                 )
                 deserializer = _DeserializationCombo(
-                    message=func_input_message, pydantic_base_model=func_input_type
+                    message=func_input_default,
+                    pydantic_base_model=func_input_type,  # type: ignore
                 )
             else:
                 logger.debug(
                     f"Registering {func} as subscriber for '{topic}' topic with deserialization "
-                    f"of `{func_input_message}`"
+                    f"of `{func_input_default}`"
                 )
-                deserializer = func_input_message
-            self._register_deserializer(
-                topic=topic, func=func, deserializer=deserializer
+                deserializer = func_input_default
+            self._register_subscriber(
+                topic=topic,
+                func=func,
+                deserializer=deserializer,
+                publish=func_output_type,
             )
             return func
 

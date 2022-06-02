@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Optional, Union
+from typing import Any, Awaitable, Callable, Union
 
 from flowtastic.message import DeserializationError
+from flowtastic.publish import Publish
 from pydantic import BaseModel, ValidationError
 
 SubscriberFunc = Callable[
-    [Union[BaseModel, dict[str, Any]]],
-    Awaitable[Optional[Union[BaseModel, dict[str, Any]]]],
+    [Union[BaseModel, dict[str, Any]]], Awaitable[Union[Publish, None]]
 ]
 """The signature of the function that is decorated using `flowtastic.FlowTastic.subscriber`
 decorator."""
