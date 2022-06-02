@@ -27,6 +27,13 @@ def configure_root_logger() -> None:
     logging.basicConfig(level=get_logging_level())
 
 
+def supress_loggers_messages() -> None:
+    """Sets the logging level of the loggers in `_config.SUPPRESS_LOGGERS_NAMES` to the
+    specified level in `_config.SUPRESS_LOGGERS_LEVEL`."""
+    for logger_name in _config.SUPPRESS_LOGGERS_NAMES:
+        logging.getLogger(logger_name).setLevel(_config.SUPPRESS_LOGGERS_LEVEL.value)
+
+
 def configure_error_tracebacks() -> None:
     """Configures `rich` error tracebacks."""
     install_rich_traceback(show_locals=_config.LOGGING_LEVEL == LoggingLevels.DEBUG)
@@ -37,6 +44,7 @@ def configure_logger() -> None:
     configure_root_logger()
     if _config.ENABLE_RICH_TRACEBACK:
         configure_error_tracebacks()
+    supress_loggers_messages()
 
 
 def get_logger(name: str) -> logging.Logger:

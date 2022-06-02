@@ -16,15 +16,32 @@ class LoggingLevels(str, Enum):
     CRITICAL = "CRITICAL"
 
 
+def build_logging_level(v: str) -> LoggingLevels:
+    """Builds a logging level from a string.
+
+    Args:
+        v: The string to build the logging level from.
+
+    Returns:
+        The logging level.
+    """
+    return LoggingLevels(v)
+
+
 class FlowTasticConfig(BaseSettings):
     """FlowTastic configuration attributes."""
 
     # Logging and tracebacks
     LOGGING_LEVEL: LoggingLevels = LoggingLevels.INFO
+    SUPPRESS_LOGGERS_NAMES: list[str] = ["asyncio", "aiokafka"]
+    SUPPRESS_LOGGERS_LEVEL: LoggingLevels = LoggingLevels.WARNING
 
-    @validator("LOGGING_LEVEL", pre=True)
-    def build_logging_level(cls, v: str) -> LoggingLevels:
-        return LoggingLevels(v)
+    _build_logging_level = validator("LOGGING_LEVEL", pre=True, allow_reuse=True)(
+        build_logging_level
+    )
+    _build_suppress_loggers_level = validator(
+        "SUPPRESS_LOGGERS_LEVEL", pre=True, allow_reuse=True
+    )(build_logging_level)
 
     ENABLE_RICH_TRACEBACK: bool = True
 
