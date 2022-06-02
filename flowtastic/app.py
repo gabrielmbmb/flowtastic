@@ -8,6 +8,7 @@ from aiokafka import AIOKafkaConsumer
 from flowtastic._deserialization_combo import _DeserializationCombo
 from flowtastic.logger import get_logger
 from flowtastic.message import DeserializationError, Message
+from flowtastic.types import DeserializationErrorFunc, ValidationErrorFunc
 from pydantic import BaseModel, ValidationError
 
 if TYPE_CHECKING:
@@ -72,11 +73,20 @@ class FlowTastic:
             self._topic_to_model[topic].append(deserialization_combo)
         self._model_to_subscriber[deserialization_combo].append(func)
 
-    def subscribe(self, topic: str) -> Callable[[SubscriberFunc], SubscriberFunc]:
+    def subscriber(
+        self,
+        topic: str,
+        on_deserialization_error: DeserializationErrorFunc | None = None,
+        on_validation_error: ValidationErrorFunc | None = None,
+    ) -> Callable[[SubscriberFunc], SubscriberFunc]:
         """A decorator to register a function as a subscriber of a topic.
 
         Args:
             topic: The topic to subscribe to.
+            on_deserialization_error: The function to call when a `flowtastic.message.DeserializationError`
+                occurs. If not provided, then the error will be ignored.
+            on_validation_error: The function to call when a `pydantic.ValidationError`
+                occurs. If not provided, then the error will be ignored.
 
         Raises:
             ValueError: If the function is not a coroutine (async function) or if the function
