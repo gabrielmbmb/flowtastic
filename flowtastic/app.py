@@ -171,7 +171,10 @@ class FlowTastic:
                 func_input_default,
                 func_output_type,
             ) = _get_subscriber_func_info(func)
-            if not isinstance(func_output_type, Publish):
+            if (
+                not isinstance(func_output_type, Publish)
+                and func_output_type is not None
+            ):
                 raise ValueError(
                     f"The return type of the subscriber function must be an instance of "
                     f"`{Publish.__name__}`. You're probably seeing this error because "
