@@ -24,5 +24,4 @@ def create_gathering(
     """
     if wrapper_func is not None:
         return asyncio.gather(*[wrapper_func(func, *args, **kwargs) for func in funcs])
-    else:
-        return asyncio.gather(*[func(*args, **kwargs) for func in funcs])
+    return asyncio.gather(*[func(*args, **kwargs) for func in funcs])
