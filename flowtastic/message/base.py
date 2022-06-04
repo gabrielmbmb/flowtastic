@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from flowtastic.message.exceptions import DeserializationError
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
+
 
 _DEFAULT_ENCODING = "utf-8"
 
@@ -55,10 +59,27 @@ class Message(ABC):
         return message.decode(self.encoding)
 
     @abstractmethod
+    def _serialize(self, python_object: BaseModel | Any) -> str:
+        """Serializes `python_object` to string. This method should be implemented by the
+        subclass to serialize a Python object to a string."""
+        ...
+
+    def serialize(self, python_object: BaseModel | Any) -> bytes:
+        """Serializes `python_object` to bytes using the specified encoding in the class.
+
+        Args:
+            python_object: The Python object to serialize.
+
+        Returns:
+            The serialized object.
+        """
+        return self._serialize(python_object).encode(self.encoding)
+
+    @abstractmethod
     def _deserialize(self, message: str) -> Any:
         """Deserialize the message. This method should be implemented by the subclass to
         generate a Python object from the message."""
-        pass
+        ...
 
     def deserialize(self, message: bytes) -> Any:
         """Deserialize the message decoding the message from bytes to string using the specified
