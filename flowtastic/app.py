@@ -4,13 +4,14 @@ import asyncio
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Callable
 
-from aiokafka import AIOKafkaConsumer
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from flowtastic._deserialization_combo import _DeserializationCombo
 from flowtastic.logger import get_logger
 from flowtastic.message import DeserializationError, JSONMessage, Message
 from flowtastic.publish import Publish
 from flowtastic.types import DeserializationErrorFunc, ValidationErrorFunc
 from flowtastic.utils.asynchronous import create_gathering
+from flowtastic.utils.list import common
 from flowtastic.utils.pydantic_models import is_base_model_subclass
 from pydantic import BaseModel, ValidationError
 
@@ -62,13 +63,15 @@ class FlowTastic:
     _loop: asyncio.AbstractEventLoop
     _consume_task: asyncio.Task[None]
     _consumer: AIOKafkaConsumer
+    _producer: AIOKafkaProducer
+    _topic_to_subscriber: dict[str, list[SubscriberFunc]] = defaultdict(list)
     _topic_to_deserializer: dict[
         str, list[Message | _DeserializationCombo]
     ] = defaultdict(list)
     _deserializer_to_subscriber: dict[
         _DeserializationCombo | Message, list[SubscriberFunc]
     ] = defaultdict(list)
-    _subscriber_to_publish: dict[SubscriberFunc, list[Publish]] = defaultdict(list)
+    _subscriber_to_publish: dict[SubscriberFunc, Publish] = {}
 
     def __init__(self, name: str, broker: str) -> None:
         """Init `FlowTastic` class.
@@ -98,11 +101,12 @@ class FlowTastic:
             deserializer: The `Message` class or the `_DeserializationCombo` class.
             publish: The `Publish` class to register.
         """
+        self._topic_to_subscriber[topic].append(func)
         if deserializer not in self._topic_to_deserializer[topic]:
             self._topic_to_deserializer[topic].append(deserializer)
         self._deserializer_to_subscriber[deserializer].append(func)
         if publish:
-            self._subscriber_to_publish[func].append(publish)
+            self._subscriber_to_publish[func] = publish
 
     def subscriber(
         self,
@@ -221,12 +225,19 @@ class FlowTastic:
         """
         return list(self._topic_to_deserializer.keys())
 
-    def _create_consumer(self) -> None:
-        """Creates an instance of `aiokafka.AIOKafkaConsumer` to consume messages from the
-        Kafka Broker."""
+    async def _create_consumer(self) -> None:
+        """Creates and starts an instance of `aiokafka.AIOKafkaConsumer` to consume messages
+        from the Kafka Broker"""
         self._consumer = AIOKafkaConsumer(
             *self._consumed_topics(), bootstrap_servers=self.broker
         )
+        await self._consumer.start()
+
+    async def _create_producer(self) -> None:
+        """Creates an instance of `aiokafka.AIOKafkaProducer` to publish messages to the
+        Kafka Broker."""
+        self._producer = AIOKafkaProducer(bootstrap_servers=self.broker)
+        await self._producer.start()
 
     async def _process_message(
         self, value: bytes, deserializer: Message | _DeserializationCombo
@@ -267,6 +278,21 @@ class FlowTastic:
             pass
         return None
 
+    async def _publish(self, python_object: BaseModel | Any, publish: Publish) -> None:
+        """Publishes the `python_object` serializing it to a `bytes` object using the
+        `publish.message` message serializer and then publishing it to the `publish.to_topics`.
+
+        Args:
+            python_object: The object to be serialized and published.
+            publish: An instance of `Publish` containing the message serializer and the
+                destination topics.
+        """
+        message = publish.message.serialize(python_object)
+        to_be_awaited = []
+        for topic in publish.to_topics:
+            to_be_awaited.append(self._producer.send_and_wait(topic, message))
+        asyncio.gather(*to_be_awaited)
+
     async def _subscriber_wrapper(
         self, func: SubscriberFunc, arg: BaseModel | Any
     ) -> None:
@@ -276,8 +302,10 @@ class FlowTastic:
             func: The subscriber function to wrap.
             arg: The argument to pass to the subscriber function.
         """
-        result = await func(arg)  # noqa
-        # TODO: handle result if the subscriber function has `Publish` annotation.
+        result = await func(arg)
+        publish = self._subscriber_to_publish.get(func, None)
+        if publish and result:
+            await self._publish(python_object=result, publish=publish)
 
     async def _distribute_message(self, record: ConsumerRecord) -> None:
         """Distributes the message to the subscribers. For that, it first deserializes the
@@ -292,27 +320,33 @@ class FlowTastic:
             python_object = await self._process_message(
                 record.value, deserializer=deserializer
             )
-            if not python_object:
-                continue
-            to_be_awaited.append(
-                create_gathering(
+            if python_object:
+                subscribers = common(
+                    self._topic_to_subscriber[topic],
                     self._deserializer_to_subscriber[deserializer],
-                    self._subscriber_wrapper,
-                    python_object,
                 )
-            )
-        asyncio.gather(*to_be_awaited)
+                to_be_awaited.append(
+                    create_gathering(
+                        subscribers, self._subscriber_wrapper, python_object
+                    )
+                )
+        if to_be_awaited:
+            asyncio.gather(*to_be_awaited)
 
     async def _consume(self) -> None:
         """Start consuming messages from the Kafka broker."""
-        self._create_consumer()
-        await self._consumer.start()
+        await self._create_consumer()
+        await self._create_producer()
         try:
             async for msg in self._consumer:
-                # TODO: create a thread for each topic consumed
+                logger.debug(f"Distributing message from topic '{msg.topic}'...")
                 await self._distribute_message(msg)
         finally:
             await self._consumer.stop()
+
+    async def _stop(self) -> None:
+        await self._consumer.stop()
+        await self._producer.stop()
 
     def run(self) -> None:
         """Run the application."""
@@ -324,5 +358,6 @@ class FlowTastic:
         except KeyboardInterrupt:
             pass
         finally:
-            self._loop.run_until_complete(self._consumer.stop())
+            logger.debug("Stopping FlowTastic application...")
+            self._loop.run_until_complete(self._stop())
             self._loop.close()
