@@ -63,6 +63,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.isort]
 profile = "black"
 known_third_party = ["flowtastic"]
+add_imports = ["from __future__ import annotations"]
 
 [tool.mypy]
 plugins = "pydantic.mypy"
