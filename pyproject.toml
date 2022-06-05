@@ -42,7 +42,7 @@ docker = "^5.0.3"
 black = "^22.3.0"
 flake8 = "^4.0.1"
 isort = "^5.10.1"
-pre-commit = "^2.19.0"
+pre-commit = { version = "^2.19.0", python=">=3.7" }
 mypy = "^0.960"
 pyupgrade = [
     { version = "2.31.0", python="<3.7" },

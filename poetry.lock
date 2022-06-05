@@ -685,7 +685,7 @@ orjson = ["orjson"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6.2"
-content-hash = "4c85f0ccefc08ccbf08fc66a8b24527089121db89e8e9757f22f6634620550ca"
+content-hash = "11b4298869876429e51135f48736cc387558cb0fb17335fd81bd2c3bf6703b0d"
 
 [metadata.files]
 aiokafka = [
