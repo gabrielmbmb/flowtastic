@@ -46,7 +46,7 @@ jobs:
           python -m poetry config virtualenvs.create false
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        run: python -m poetry install
+        run: python -m poetry install --extras "orjson"
       - name: Lint
         run: python -m poetry run bash scripts/lint.sh
       - name: Test
