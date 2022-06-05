@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.6.2"
 pydantic = "^1.9.1"
 aiokafka = "^0.7.2"
 rich = "^12.4.4"
@@ -42,7 +42,10 @@ flake8 = "^4.0.1"
 isort = "^5.10.1"
 pre-commit = "^2.19.0"
 mypy = "^0.960"
-pyupgrade = "^2.32.1"
+pyupgrade = [
+    { version = "2.31.0", python="<3.7" },
+    { version = "^2.32.1", python=">=3.7" },
+]
 pytest-cov = "^3.0.0"
 
 [tool.poetry.extras]
