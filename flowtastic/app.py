@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Type
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from flowtastic._deserialization_combo import _DeserializationCombo
@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 def _get_subscriber_func_info(
     func: SubscriberFunc,
-) -> tuple[type[BaseModel] | Any | None, Message | None, Publish | None]:
+) -> tuple[Type[BaseModel] | Any | None, Message | None, Publish | None]:
     """Returns the type and default value of the argument, and the return type of one
     `SubscriberFunc`.
 

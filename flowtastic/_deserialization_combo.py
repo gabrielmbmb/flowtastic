@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Type
 
 from flowtastic.message import Message
 
@@ -18,7 +18,7 @@ class _DeserializationCombo:
         pydantic_base_model: The `BaseModel` class type.
     """
 
-    def __init__(self, message: Message, pydantic_base_model: type[BaseModel]) -> None:
+    def __init__(self, message: Message, pydantic_base_model: Type[BaseModel]) -> None:
         """Inits `_DeserializationCombo` class.
 
         Args:
