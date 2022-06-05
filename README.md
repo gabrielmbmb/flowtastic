@@ -7,6 +7,9 @@
             Heavily inspired by <a href="https://github.com/tiangolo/fastapi">FastAPI</a>.
         </em>
     </p>
+    <a href="https://github.com/gabrielmbmb/flowtastic/actions/workflows/test.yaml">
+        <img src="https://github.com/gabrielmbmb/flowtastic/actions/workflows/test.yaml/badge.svg" alt="Test Workflow">
+    </a>
     <a href="https://pypi.org/project/flowtastic">
         <img src="https://img.shields.io/pypi/v/flowtastic" alt="Python package version">
     </a>
