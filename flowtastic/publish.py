@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from flowtastic.message import JSONMessage
 
@@ -18,10 +18,10 @@ class Publish:
             subscriber function before publishing it to the topics.
     """
 
-    to_topics: list[str]
+    to_topics: List[str]
     message: Message
 
-    def __init__(self, to_topics: list[str], message: Message = JSONMessage()) -> None:
+    def __init__(self, to_topics: List[str], message: Message = JSONMessage()) -> None:
         """Inits `Publish` class.
 
         Args:

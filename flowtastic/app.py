@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Type
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Type, Union
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from flowtastic._deserialization_combo import _DeserializationCombo
@@ -25,7 +25,9 @@ logger = get_logger(__name__)
 
 def _get_subscriber_func_info(
     func: SubscriberFunc,
-) -> tuple[Type[BaseModel] | Any | None, Message | None, Publish | None]:
+) -> Tuple[
+    Union[Type[BaseModel], Any, None], Union[Message, None], Union[Publish, None]
+]:
     """Returns the type and default value of the argument, and the return type of one
     `SubscriberFunc`.
 
@@ -64,14 +66,14 @@ class FlowTastic:
     _consume_task: asyncio.Task[None]
     _consumer: AIOKafkaConsumer
     _producer: AIOKafkaProducer
-    _topic_to_subscriber: dict[str, list[SubscriberFunc]] = defaultdict(list)
-    _topic_to_deserializer: dict[
-        str, list[Message | _DeserializationCombo]
+    _topic_to_subscriber: Dict[str, List[SubscriberFunc]] = defaultdict(list)
+    _topic_to_deserializer: Dict[
+        str, List[Message | _DeserializationCombo]
     ] = defaultdict(list)
-    _deserializer_to_subscriber: dict[
-        _DeserializationCombo | Message, list[SubscriberFunc]
+    _deserializer_to_subscriber: Dict[
+        _DeserializationCombo | Message, List[SubscriberFunc]
     ] = defaultdict(list)
-    _subscriber_to_publish: dict[SubscriberFunc, Publish] = {}
+    _subscriber_to_publish: Dict[SubscriberFunc, Publish] = {}
 
     def __init__(self, name: str, broker: str) -> None:
         """Init `FlowTastic` class.
@@ -88,8 +90,8 @@ class FlowTastic:
         self,
         topic: str,
         func: SubscriberFunc,
-        deserializer: Message | _DeserializationCombo,
-        publish: Publish | None = None,
+        deserializer: Union[Message, _DeserializationCombo],
+        publish: Union[Publish, None] = None,
     ) -> None:
         """Register a `Message` class or a `_DeserializationCombo` to the `_topic_to_deserializer`
         dictionary, the subscriber function to the `_deserializer_to_subscriber` dictionary
@@ -111,8 +113,8 @@ class FlowTastic:
     def subscriber(
         self,
         topic: str,
-        on_deserialization_error: DeserializationErrorFunc | None = None,
-        on_validation_error: ValidationErrorFunc | None = None,
+        on_deserialization_error: Union[DeserializationErrorFunc, None] = None,
+        on_validation_error: Union[ValidationErrorFunc, None] = None,
     ) -> Callable[[SubscriberFunc], SubscriberFunc]:
         """A decorator to register a function as a subscriber of a topic. A subscriber function
         should accept a single argument and the type of this argument has to be a `BaseModel`
@@ -217,7 +219,7 @@ class FlowTastic:
 
         return register_subscriber
 
-    def _consumed_topics(self) -> list[str]:
+    def _consumed_topics(self) -> List[str]:
         """Returns the topics that should be consumed by the application.
 
         Returns:
@@ -240,8 +242,8 @@ class FlowTastic:
         await self._producer.start()
 
     async def _process_message(
-        self, value: bytes, deserializer: Message | _DeserializationCombo
-    ) -> BaseModel | Any | None:
+        self, value: bytes, deserializer: Union[Message, _DeserializationCombo]
+    ) -> Union[BaseModel, Any, None]:
         """Process the `value` attribute of a `aiokafka.ConsumerRecord` deserializing the
         message and if needed, converting it to a `pydantic.BaseModel`. If the deserialization
         fails or the conversion to a `pydantic.BaseModel` fails, then the provided callbacks
@@ -278,7 +280,9 @@ class FlowTastic:
             pass
         return None
 
-    async def _publish(self, python_object: BaseModel | Any, publish: Publish) -> None:
+    async def _publish(
+        self, python_object: Union[BaseModel, Any], publish: Publish
+    ) -> None:
         """Publishes the `python_object` serializing it to a `bytes` object using the
         `publish.message` message serializer and then publishing it to the `publish.to_topics`.
 
@@ -294,7 +298,7 @@ class FlowTastic:
         asyncio.gather(*to_be_awaited)
 
     async def _subscriber_wrapper(
-        self, func: SubscriberFunc, arg: BaseModel | Any
+        self, func: SubscriberFunc, arg: Union[BaseModel, Any]
     ) -> None:
         """Wraps the subscriber function to handle the return value of the function if needed.
 

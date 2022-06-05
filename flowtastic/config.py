@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import List
 
 from pydantic import BaseSettings, validator
 
@@ -33,7 +34,7 @@ class FlowTasticConfig(BaseSettings):
 
     # Logging and tracebacks
     LOGGING_LEVEL: LoggingLevels = LoggingLevels.INFO
-    SUPPRESS_LOGGERS_NAMES: list[str] = ["asyncio", "aiokafka"]
+    SUPPRESS_LOGGERS_NAMES: List[str] = ["asyncio", "aiokafka"]
     SUPPRESS_LOGGERS_LEVEL: LoggingLevels = LoggingLevels.WARNING
 
     _build_logging_level = validator("LOGGING_LEVEL", pre=True, allow_reuse=True)(

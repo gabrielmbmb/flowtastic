@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import List, TypeVar
 
 T = TypeVar("T")
 
 
-def common(a: list[T], b: list[T]) -> list[T]:
+def common(a: List[T], b: List[T]) -> List[T]:
     """Returns the common elements of two lists.
 
     Args:

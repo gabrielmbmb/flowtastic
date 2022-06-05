@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, List, Union
 
 
 def create_gathering(
-    funcs: list[Callable[..., Awaitable[Any]]],
-    wrapper_func: Callable[..., Awaitable[None]] | None = None,
+    funcs: List[Callable[..., Awaitable[Any]]],
+    wrapper_func: Union[Callable[..., Awaitable[None]], None] = None,
     *args: Any,
     **kwargs: Any,
 ) -> asyncio.futures.Future:  # type: ignore
