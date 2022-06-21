@@ -25,6 +25,7 @@ repos:
         additional_dependencies:
           - pydantic
           - typer
+          - types-PyYAML
 ci:
     autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks
     autoupdate_commit_msg: ⬆ [pre-commit.ci] pre-commit autoupdate
