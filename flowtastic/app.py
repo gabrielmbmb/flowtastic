@@ -291,11 +291,7 @@ class FlowTastic:
             publish: An instance of `Publish` containing the message serializer and the
                 destination topics.
         """
-        message = publish.message.serialize(python_object)
-        to_be_awaited = []
-        for topic in publish.to_topics:
-            to_be_awaited.append(self._producer.send_and_wait(topic, message))
-        asyncio.gather(*to_be_awaited)
+        await publish.publish(producer=self._producer, python_object=python_object)
 
     async def _subscriber_wrapper(
         self, func: SubscriberFunc, arg: Union[BaseModel, Any]
@@ -335,7 +331,7 @@ class FlowTastic:
                     )
                 )
         if to_be_awaited:
-            asyncio.gather(*to_be_awaited)
+            await asyncio.gather(*to_be_awaited)
 
     async def _consume(self) -> None:
         """Start consuming messages from the Kafka broker."""
