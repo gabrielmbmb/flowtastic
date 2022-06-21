@@ -480,7 +480,7 @@ python-versions = "*"
 name = "pyyaml"
 version = "6.0"
 description = "YAML parser and emitter for Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -642,11 +642,12 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 
 [extras]
 orjson = ["orjson"]
+yaml = ["PyYAML"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "aaf65ec0bb42c01e2906e9ed3c8bb7fda1e875e06795d58a2c16bb43fb2e1411"
+content-hash = "374a3f5df03a1970e4b1455eae42c5a9ef4f7ea9523479368f2acefaf60bc3d9"
 
 [metadata.files]
 aiokafka = [
