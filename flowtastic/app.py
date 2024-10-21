@@ -67,9 +67,9 @@ class FlowTastic:
     _consumer: AIOKafkaConsumer
     _producer: AIOKafkaProducer
     _topic_to_subscriber: Dict[str, List[SubscriberFunc]] = defaultdict(list)
-    _topic_to_deserializer: Dict[
-        str, List[Message | _DeserializationCombo]
-    ] = defaultdict(list)
+    _topic_to_deserializer: Dict[str, List[Message | _DeserializationCombo]] = (
+        defaultdict(list)
+    )
     _deserializer_to_subscriber: Dict[
         _DeserializationCombo | Message, List[SubscriberFunc]
     ] = defaultdict(list)
