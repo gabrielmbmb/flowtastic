@@ -29,5 +29,4 @@ def main(
         is_eager=True,
         help="Prints the FlowTastic version and exit.",
     )
-) -> None:
-    ...
+) -> None: ...
